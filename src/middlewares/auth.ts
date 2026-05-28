@@ -2,8 +2,13 @@ import { requireAuth } from '@clerk/express';
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma';
 
-// Use this middleware for routes that require the user to be logged in.
-export const authenticate = requireAuth();
+export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.auth || !req.auth.userId) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  next();
+};
 
 // Use this middleware to ensure the user exists in our DB and is an admin
 export const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
