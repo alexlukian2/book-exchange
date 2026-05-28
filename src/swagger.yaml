@@ -1,0 +1,158 @@
+openapi: 3.0.0
+info:
+  title: Book Exchange API
+  version: 1.0.0
+  description: API для сервісу обміну книгами
+servers:
+  - url: http://localhost:3000/api
+    description: Local server
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT токен від Clerk (доступний після логіну)
+paths:
+  /books:
+    get:
+      summary: Отримати список всіх книг
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+          description: Номер сторінки
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: Кількість елементів
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Пошук за назвою або автором
+      responses:
+        '200':
+          description: Успішно
+  /books/{id}:
+    get:
+      summary: Отримати книгу за ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успішно
+        '404':
+          description: Не знайдено
+  /me/books:
+    get:
+      summary: Отримати мої книги
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Успішно
+    post:
+      summary: Створити книгу
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                author:
+                  type: string
+                photo:
+                  type: string
+                  format: binary
+              required:
+                - name
+                - author
+      responses:
+        '201':
+          description: Створено
+  /me/books/{id}:
+    delete:
+      summary: Видалити книгу
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Успішно видалено
+  /books/{id}/exchange:
+    post:
+      summary: Створити запит на обмін
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Запит на обмін створено
+        '400':
+          description: Помилка (наприклад, запит на власну книгу)
+  /admin/users:
+    get:
+      summary: Отримати всіх користувачів (ADMIN)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Успішно
+  /admin/users/{id}/role:
+    put:
+      summary: Змінити роль користувача (ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [USER, ADMIN]
+      responses:
+        '200':
+          description: Успішно
+  /admin/users/{id}:
+    delete:
+      summary: Видалити користувача (ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Успішно видалено

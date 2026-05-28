@@ -6,6 +6,9 @@ import { clerkMiddleware } from '@clerk/express';
 import webhookRoutes from './routes/webhook';
 import bookRoutes from './routes/books';
 import adminRoutes from './routes/admin';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
+import path from 'path';
 
 dotenv.config();
 
@@ -24,6 +27,10 @@ app.use('/api/webhooks', webhookRoutes);
 
 // Body Parser Middleware for all other routes
 app.use(express.json());
+
+// Swagger API Documentation
+const swaggerDocument = YAML.load(path.join(__dirname, 'swagger.yaml'));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Routes
 app.use('/api', bookRoutes);

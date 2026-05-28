@@ -49,7 +49,7 @@ export const getBooks = async (req: Request, res: Response) => {
 // GET /books/:id
 export const getBookById = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const book = await prisma.book.findUnique({
       where: { id },
       include: { owner: { select: { id: true, name: true, avatarUrl: true } } }
@@ -88,7 +88,7 @@ export const createBook = async (req: Request, res: Response) => {
     // Валідація тіла запиту
     const parseResult = createBookSchema.safeParse(req.body);
     if (!parseResult.success) {
-      res.status(400).json({ error: 'Invalid input', details: parseResult.error.errors });
+      res.status(400).json({ error: 'Invalid input', details: parseResult.error.format() });
       return;
     }
 
@@ -120,7 +120,7 @@ export const createBook = async (req: Request, res: Response) => {
 export const deleteBook = async (req: Request, res: Response) => {
   try {
     const auth = (req as any).auth;
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const book = await prisma.book.findUnique({ where: { id } });
 
@@ -146,7 +146,7 @@ export const deleteBook = async (req: Request, res: Response) => {
 export const requestExchange = async (req: Request, res: Response) => {
   try {
     const auth = (req as any).auth;
-    const targetBookId = req.params.id;
+    const targetBookId = req.params.id as string;
 
     const targetBook = await prisma.book.findUnique({
       where: { id: targetBookId },

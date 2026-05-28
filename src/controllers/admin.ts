@@ -34,7 +34,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
 // PUT /admin/users/:id/role
 export const updateUserRole = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { role } = req.body; // 'USER' або 'ADMIN'
 
     if (role !== 'USER' && role !== 'ADMIN') {
@@ -56,7 +56,7 @@ export const updateUserRole = async (req: Request, res: Response) => {
 // DELETE /admin/users/:id
 export const deleteUser = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     // В Clerk також потрібно було б видалити юзера через Clerk API,
     // але для MVP видаляємо лише з нашої бази
