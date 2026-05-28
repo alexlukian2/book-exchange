@@ -15,8 +15,8 @@ tags:
   - name: Webhooks
     description: Clerk webhook для синхронізації користувачів
 servers:
-  - url: http://localhost:3000/api
-    description: Local development server
+  - url: /api
+    description: Current server (relative)
 components:
   securitySchemes:
     bearerAuth:
