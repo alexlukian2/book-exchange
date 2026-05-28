@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { clerkMiddleware } from '@clerk/express';
 import webhookRoutes from './routes/webhook';
 import bookRoutes from './routes/books';
+import adminRoutes from './routes/admin';
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api', bookRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
