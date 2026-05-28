@@ -1,3 +1,5 @@
+import { getAuth } from '@clerk/express';
+
 import { Request, Response } from 'express';
 import * as bookService from '../services/book.service';
 import * as exchangeService from '../services/exchange.service';
@@ -41,7 +43,7 @@ export const getBookById = async (req: Request, res: Response) => {
 
 // GET /me/books — authenticated
 export const getMyBooks = async (req: Request, res: Response) => {
-  const books = await bookService.getMyBooks(req.auth!.userId);
+  const books = await bookService.getMyBooks(getAuth(req).userId!);
   res.json(books);
 };
 
@@ -60,7 +62,7 @@ export const createBook = async (req: Request, res: Response) => {
     author,
     description,
     condition,
-    ownerId: req.auth!.userId,
+    ownerId: getAuth(req).userId!,
     file: req.file ? { buffer: req.file.buffer, mimetype: req.file.mimetype } : undefined,
   });
 
@@ -77,7 +79,7 @@ export const updateBook = async (req: Request, res: Response) => {
 
   const result = await bookService.updateBook(
     req.params.id as string,
-    req.auth!.userId,
+    getAuth(req).userId!,
     parseResult.data,
     req.file ? { buffer: req.file.buffer, mimetype: req.file.mimetype } : undefined
   );
@@ -95,10 +97,14 @@ export const updateBook = async (req: Request, res: Response) => {
 };
 
 export const deleteBook = async (req: Request, res: Response) => {
-  const user = await prisma.user.findUnique({ where: { id: req.auth!.userId } });
+  const user = await prisma.user.findUnique({ where: { id: getAuth(req).userId! } });
   const userRole = user?.role || 'USER';
 
-  const result = await bookService.deleteBook(req.params.id as string, req.auth!.userId, userRole);
+  const result = await bookService.deleteBook(
+    req.params.id as string,
+    getAuth(req).userId!,
+    userRole
+  );
 
   if (result === 'NOT_FOUND') {
     res.status(404).json({ error: 'Book not found' });
@@ -114,7 +120,10 @@ export const deleteBook = async (req: Request, res: Response) => {
 
 // POST /books/:id/exchange — authenticated, rate-limited
 export const requestExchange = async (req: Request, res: Response) => {
-  const result = await exchangeService.requestExchange(req.auth!.userId, req.params.id as string);
+  const result = await exchangeService.requestExchange(
+    getAuth(req).userId!,
+    req.params.id as string
+  );
 
   switch (result.status) {
     case 'NOT_FOUND':
@@ -140,7 +149,7 @@ export const requestExchange = async (req: Request, res: Response) => {
 
 // GET /me/exchanges — authenticated
 export const getMyExchanges = async (req: Request, res: Response) => {
-  const exchanges = await exchangeService.getMyExchanges(req.auth!.userId);
+  const exchanges = await exchangeService.getMyExchanges(getAuth(req).userId!);
   res.json(exchanges);
 };
 
@@ -154,7 +163,7 @@ export const handleExchangeAction = async (req: Request, res: Response) => {
 
   const result = await exchangeService.updateExchangeStatus(
     req.params.id as string,
-    req.auth!.userId,
+    getAuth(req).userId!,
     parseResult.data.action
   );
 

@@ -1,9 +1,10 @@
-import { requireAuth } from '@clerk/express';
+import { getAuth } from '@clerk/express';
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma';
 
 export const authenticate = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.auth || !req.auth.userId) {
+  const auth = getAuth(req);
+  if (!auth || !auth.userId) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
@@ -13,7 +14,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
 // Use this middleware to ensure the user exists in our DB and is an admin
 export const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const auth = (req as Request & { auth?: { userId?: string } }).auth; // In Clerk, req.auth contains the user's ID
+    const auth = getAuth(req);
     if (!auth || !auth.userId) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
