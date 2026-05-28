@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { clerkMiddleware } from '@clerk/express';
 import webhookRoutes from './routes/webhook';
+import bookRoutes from './routes/books';
 
 dotenv.config();
 
@@ -24,6 +25,8 @@ app.use('/api/webhooks', webhookRoutes);
 app.use(express.json());
 
 // Routes
+app.use('/api', bookRoutes);
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
