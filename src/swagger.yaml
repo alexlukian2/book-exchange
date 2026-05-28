@@ -1,33 +1,150 @@
 openapi: 3.0.0
 info:
   title: Book Exchange API
-  version: 1.0.0
-  description: API для сервісу обміну книгами
+  version: 2.0.0
+  description: API для сервісу обміну книгами — пошук, публікація та обмін книгами між користувачами
+tags:
+  - name: Books
+    description: Публічні операції з книгами
+  - name: My Books
+    description: Управління власними книгами (потребує авторизації)
+  - name: Exchanges
+    description: Запити на обмін книгами
+  - name: Admin
+    description: Адміністративні операції (потребує ролі ADMIN)
+  - name: Webhooks
+    description: Clerk webhook для синхронізації користувачів
 servers:
   - url: http://localhost:3000/api
-    description: Local server
+    description: Local development server
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT токен від Clerk (доступний після логіну)
+      description: JWT токен від Clerk
+  schemas:
+    Book:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        author:
+          type: string
+        description:
+          type: string
+          nullable: true
+        condition:
+          type: string
+          enum: [NEW, GOOD, FAIR, POOR]
+        photoUrl:
+          type: string
+          nullable: true
+        isAvailable:
+          type: boolean
+        ownerId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        owner:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            avatarUrl:
+              type: string
+              nullable: true
+    ExchangeRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        senderId:
+          type: string
+        receiverId:
+          type: string
+        targetBookId:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, ACCEPTED, REJECTED]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+  responses:
+    Unauthorized:
+      description: Не авторизовано — відсутній або невалідний JWT токен
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Заборонено — недостатньо прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не знайдено
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalError:
+      description: Внутрішня помилка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
 paths:
   /books:
     get:
-      summary: Отримати список всіх книг
+      summary: Отримати список всіх доступних книг
+      tags: [Books]
       parameters:
         - in: query
           name: page
           schema:
             type: integer
+            default: 1
           description: Номер сторінки
         - in: query
           name: limit
           schema:
             type: integer
-          description: Кількість елементів
+            default: 10
+            maximum: 100
+          description: Кількість елементів на сторінку (макс. 100)
         - in: query
           name: search
           schema:
@@ -35,31 +152,64 @@ paths:
           description: Пошук за назвою або автором
       responses:
         '200':
-          description: Успішно
+          description: Список книг з пагінацією
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Book'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /books/{id}:
     get:
       summary: Отримати книгу за ID
+      tags: [Books]
       parameters:
         - in: path
           name: id
           required: true
           schema:
             type: string
+            format: uuid
       responses:
         '200':
-          description: Успішно
+          description: Деталі книги
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
         '404':
-          description: Не знайдено
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /me/books:
     get:
       summary: Отримати мої книги
+      tags: [My Books]
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Успішно
+          description: Список власних книг
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Book'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
-      summary: Створити книгу
+      summary: Додати нову книгу
+      tags: [My Books]
       security:
         - bearerAuth: []
       requestBody:
@@ -68,22 +218,101 @@ paths:
             schema:
               type: object
               properties:
-                name:
+                title:
                   type: string
+                  description: Назва книги
                 author:
                   type: string
+                  description: Автор книги
+                description:
+                  type: string
+                  description: Опис книги
+                condition:
+                  type: string
+                  enum: [NEW, GOOD, FAIR, POOR]
+                  default: GOOD
+                  description: Стан книги
                 photo:
                   type: string
                   format: binary
+                  description: Фото книги (JPG, PNG, WebP, макс. 5MB)
               required:
-                - name
+                - title
                 - author
       responses:
         '201':
-          description: Створено
+          description: Книгу створено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '400':
+          description: Невалідні дані
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /me/books/{id}:
+    put:
+      summary: Оновити книгу
+      tags: [My Books]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                author:
+                  type: string
+                description:
+                  type: string
+                condition:
+                  type: string
+                  enum: [NEW, GOOD, FAIR, POOR]
+                isAvailable:
+                  type: boolean
+                photo:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Книгу оновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '400':
+          description: Невалідні дані
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
       summary: Видалити книгу
+      tags: [My Books]
       security:
         - bearerAuth: []
       parameters:
@@ -92,12 +321,23 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
       responses:
         '204':
-          description: Успішно видалено
+          description: Книгу видалено
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /books/{id}/exchange:
     post:
-      summary: Створити запит на обмін
+      summary: Надіслати запит на обмін книги
+      description: Створює запит на обмін. Власнику книги надсилається email-повідомлення. Rate limited (10 запитів / 15 хв).
+      tags: [Exchanges]
       security:
         - bearerAuth: []
       parameters:
@@ -106,22 +346,144 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
+          description: ID книги для обміну
       responses:
         '201':
           description: Запит на обмін створено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  exchangeRequest:
+                    $ref: '#/components/schemas/ExchangeRequest'
         '400':
-          description: Помилка (наприклад, запит на власну книгу)
-  /admin/users:
+          description: Помилка (власна книга, дублікат, недоступна)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          description: Забагато запитів
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /me/exchanges:
     get:
-      summary: Отримати всіх користувачів (ADMIN)
+      summary: Отримати мої запити на обмін
+      description: Повертає відправлені та отримані запити на обмін
+      tags: [Exchanges]
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Успішно
+          description: Списки запитів
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sent:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExchangeRequest'
+                  received:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExchangeRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /exchanges/{id}:
+    patch:
+      summary: Прийняти або відхилити запит на обмін
+      description: Тільки власник книги може прийняти або відхилити запит. При прийнятті книга стає недоступною, а всі інші pending запити автоматично відхиляються.
+      tags: [Exchanges]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID запиту на обмін
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [ACCEPTED, REJECTED]
+              required:
+                - action
+      responses:
+        '200':
+          description: Статус запиту оновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeRequest'
+        '400':
+          description: Запит вже оброблено або невалідні дані
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/users:
+    get:
+      summary: Отримати всіх користувачів
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+      responses:
+        '200':
+          description: Список користувачів з пагінацією
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /admin/users/{id}/role:
     put:
-      summary: Змінити роль користувача (ADMIN)
+      summary: Змінити роль користувача
+      tags: [Admin]
       security:
         - bearerAuth: []
       parameters:
@@ -131,6 +493,7 @@ paths:
           schema:
             type: string
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -139,12 +502,27 @@ paths:
                 role:
                   type: string
                   enum: [USER, ADMIN]
+              required:
+                - role
       responses:
         '200':
-          description: Успішно
+          description: Роль оновлено
+        '400':
+          description: Невалідна роль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /admin/users/{id}:
     delete:
-      summary: Видалити користувача (ADMIN)
+      summary: Видалити користувача
+      tags: [Admin]
       security:
         - bearerAuth: []
       parameters:
@@ -155,4 +533,10 @@ paths:
             type: string
       responses:
         '204':
-          description: Успішно видалено
+          description: Користувача видалено
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'

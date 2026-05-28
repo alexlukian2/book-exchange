@@ -1,22 +1,34 @@
 import { Router } from 'express';
-import { getBooks, getBookById, getMyBooks, createBook, deleteBook, requestExchange } from '../controllers/books';
+import {
+  getBooks,
+  getBookById,
+  getMyBooks,
+  createBook,
+  updateBook,
+  deleteBook,
+  requestExchange,
+  getMyExchanges,
+  handleExchangeAction,
+} from '../controllers/books';
 import { authenticate } from '../middlewares/auth';
-import { upload } from '../middlewares/upload';
+import { upload, validateFileContent } from '../middlewares/upload';
+import { exchangeLimiter } from '../middlewares/rateLimit';
 
 const router = Router();
 
-// Публічні маршрути
+// Public routes
 router.get('/books', getBooks);
 router.get('/books/:id', getBookById);
 
-// Приватні маршрути (вимагають авторизації)
+// Authenticated routes — my books
 router.get('/me/books', authenticate, getMyBooks);
-
-// При створенні книги можемо завантажувати фото ('photo' - назва поля у form-data)
-router.post('/me/books', authenticate, upload.single('photo'), createBook);
+router.post('/me/books', authenticate, upload.single('photo'), validateFileContent, createBook);
+router.put('/me/books/:id', authenticate, upload.single('photo'), validateFileContent, updateBook);
 router.delete('/me/books/:id', authenticate, deleteBook);
 
-// Запит на обмін
-router.post('/books/:id/exchange', authenticate, requestExchange);
+// Exchange routes
+router.post('/books/:id/exchange', authenticate, exchangeLimiter, requestExchange);
+router.get('/me/exchanges', authenticate, getMyExchanges);
+router.patch('/exchanges/:id', authenticate, handleExchangeAction);
 
 export default router;

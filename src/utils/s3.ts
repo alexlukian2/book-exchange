@@ -1,42 +1,59 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
-import dotenv from 'dotenv';
+import { config } from '../config/env';
 
-dotenv.config();
-
-const region = process.env.AWS_REGION || 'us-east-1';
-const accessKeyId = process.env.AWS_ACCESS_KEY_ID || '';
-const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || '';
-const bucketName = process.env.AWS_S3_BUCKET_NAME || '';
+const MIME_TO_EXTENSION: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
 
 export const s3Client = new S3Client({
-  region,
+  region: config.s3.region,
+  endpoint: config.s3.endpoint,
+  forcePathStyle: true, // Required for Supabase S3 compatibility
   credentials: {
-    accessKeyId,
-    secretAccessKey,
+    accessKeyId: config.s3.accessKeyId,
+    secretAccessKey: config.s3.secretAccessKey,
   },
 });
 
-export const uploadFileToS3 = async (fileBuffer: Buffer, originalname: string, mimetype: string): Promise<string> => {
+/**
+ * Upload a file buffer to S3.
+ * Uses validated MIME type for file extension (not the user-provided originalname)
+ * to prevent stored XSS via malicious file extensions (e.g., .html, .svg).
+ */
+export const uploadFileToS3 = async (
+  fileBuffer: Buffer,
+  validatedMimeType: string
+): Promise<string> => {
+  const bucketName = config.s3.bucketName;
+
   if (!bucketName) {
-    throw new Error('AWS_S3_BUCKET_NAME is not set');
+    throw new Error('SUPABASE_S3_BUCKET_NAME is not set');
   }
 
-  // Створюємо унікальне ім'я файлу, щоб уникнути конфліктів
-  const extension = originalname.split('.').pop() || 'jpg';
+  // Derive extension from validated MIME type only — never from user input
+  const extension = MIME_TO_EXTENSION[validatedMimeType];
+  if (!extension) {
+    throw new Error(`Unsupported MIME type: ${validatedMimeType}`);
+  }
+
   const fileName = `books/${uuidv4()}.${extension}`;
 
   const command = new PutObjectCommand({
     Bucket: bucketName,
     Key: fileName,
     Body: fileBuffer,
-    ContentType: mimetype,
-    // Можна зробити файл публічно доступним, якщо бакет налаштовано відповідно
-    // ACL: 'public-read', 
+    ContentType: validatedMimeType,
+    ContentDisposition: 'inline',
   });
 
   await s3Client.send(command);
 
-  // Формуємо URL для доступу до файлу
-  return `https://${bucketName}.s3.${region}.amazonaws.com/${fileName}`;
+  // Construct the public URL for Supabase Storage
+  // S3 Endpoint: https://[PROJECT_REF].supabase.co/storage/v1/s3
+  // Public URL: https://[PROJECT_REF].supabase.co/storage/v1/object/public/[BUCKET]/[FILE]
+  const baseUrl = config.s3.endpoint.replace('/s3', '');
+  return `${baseUrl}/object/public/${bucketName}/${fileName}`;
 };

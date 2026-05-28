@@ -1,13 +1,17 @@
 import multer from 'multer';
-import path from 'path';
+import { Request, Response, NextFunction } from 'express';
 
-// Зберігаємо файли в пам'яті (щоб потім одразу відправити в S3)
+// Store files in memory (to send directly to S3)
 const storage = multer.memoryStorage();
 
-// Дозволені типи файлів (Allow-list згідно з вимогами безпеки)
+// Allowed MIME types (allow-list per security requirements)
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (
+  req: Express.Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
   if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -15,7 +19,7 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
   }
 };
 
-// Ліміт на розмір файлу: 5 МБ (щоб уникнути DoS-атак великими файлами)
+// File size limit: 5 MB (prevents DoS via large uploads)
 export const upload = multer({
   storage,
   limits: {
@@ -23,3 +27,41 @@ export const upload = multer({
   },
   fileFilter,
 });
+
+/**
+ * Middleware to validate file content via magic bytes after multer processes it.
+ * The client-provided MIME type is untrusted — we verify actual file content.
+ * Uses dynamic import for file-type (ESM module).
+ */
+export const validateFileContent = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  if (!req.file) {
+    next();
+    return;
+  }
+
+  try {
+    // file-type is ESM-only — use dynamic import to load in CJS context
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const fileType: { fileTypeFromBuffer: (buf: Uint8Array) => Promise<{ mime: string; ext: string } | undefined> } =
+      await (new Function('return import("file-type")')() as Promise<any>);
+    const detectedType = await fileType.fileTypeFromBuffer(req.file.buffer);
+
+    if (!detectedType || !ALLOWED_MIME_TYPES.includes(detectedType.mime)) {
+      res.status(400).json({
+        error: 'Invalid file content. File does not match an allowed image type.',
+      });
+      return;
+    }
+
+    // Override the client-provided MIME type with the detected one
+    req.file.mimetype = detectedType.mime;
+    next();
+  } catch (error) {
+    console.error('File validation error:', error);
+    res.status(500).json({ error: 'Failed to validate file content' });
+  }
+};

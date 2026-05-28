@@ -17,6 +17,13 @@ enum ExchangeStatus {
   REJECTED
 }
 
+enum BookCondition {
+  NEW
+  GOOD
+  FAIR
+  POOR
+}
+
 model User {
   id               String            @id // Clerk ID
   email            String            @unique
@@ -33,15 +40,22 @@ model User {
 
 model Book {
   id               String            @id @default(uuid())
-  name             String
+  title            String
   author           String
+  description      String?
+  condition        BookCondition     @default(GOOD)
   photoUrl         String?
+  isAvailable      Boolean           @default(true)
   ownerId          String
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
   owner            User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   exchangeRequests ExchangeRequest[]
+
+  @@index([ownerId])
+  @@index([title])
+  @@index([author])
 }
 
 model ExchangeRequest {
@@ -56,4 +70,9 @@ model ExchangeRequest {
   sender           User              @relation("SentRequests", fields: [senderId], references: [id], onDelete: Cascade)
   receiver         User              @relation("ReceivedRequests", fields: [receiverId], references: [id], onDelete: Cascade)
   targetBook       Book              @relation(fields: [targetBookId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([targetBookId])
+  @@index([status])
 }
