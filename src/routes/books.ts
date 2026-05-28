@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getBooks, getBookById, getMyBooks, createBook, deleteBook } from '../controllers/books';
+import { getBooks, getBookById, getMyBooks, createBook, deleteBook, requestExchange } from '../controllers/books';
 import { authenticate } from '../middlewares/auth';
 import { upload } from '../middlewares/upload';
 
@@ -15,5 +15,8 @@ router.get('/me/books', authenticate, getMyBooks);
 // При створенні книги можемо завантажувати фото ('photo' - назва поля у form-data)
 router.post('/me/books', authenticate, upload.single('photo'), createBook);
 router.delete('/me/books/:id', authenticate, deleteBook);
+
+// Запит на обмін
+router.post('/books/:id/exchange', authenticate, requestExchange);
 
 export default router;

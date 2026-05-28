@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../utils/prisma';
 import { createBookSchema, updateBookSchema } from '../schemas/book';
 import { uploadFileToS3 } from '../utils/s3';
+import { sendExchangeRequestEmail } from '../utils/email';
 
 // GET /books
 export const getBooks = async (req: Request, res: Response) => {
@@ -137,6 +138,75 @@ export const deleteBook = async (req: Request, res: Response) => {
     
     res.status(204).send();
   } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// POST /books/:id/exchange
+export const requestExchange = async (req: Request, res: Response) => {
+  try {
+    const auth = (req as any).auth;
+    const targetBookId = req.params.id;
+
+    const targetBook = await prisma.book.findUnique({
+      where: { id: targetBookId },
+      include: { owner: true }
+    });
+
+    if (!targetBook) {
+      res.status(404).json({ error: 'Book not found' });
+      return;
+    }
+
+    if (targetBook.ownerId === auth.userId) {
+      res.status(400).json({ error: 'You cannot request your own book' });
+      return;
+    }
+
+    // Перевірка чи вже є такий активний запит
+    const existingRequest = await prisma.exchangeRequest.findFirst({
+      where: {
+        senderId: auth.userId,
+        targetBookId: targetBookId,
+        status: 'PENDING'
+      }
+    });
+
+    if (existingRequest) {
+      res.status(400).json({ error: 'You already requested this book' });
+      return;
+    }
+
+    // Створюємо запит в базі
+    const exchangeRequest = await prisma.exchangeRequest.create({
+      data: {
+        senderId: auth.userId,
+        receiverId: targetBook.ownerId,
+        targetBookId: targetBookId,
+      }
+    });
+
+    // Отримуємо інформацію про відправника та його книги
+    const requestor = await prisma.user.findUnique({
+      where: { id: auth.userId },
+      include: { books: true }
+    });
+
+    if (requestor) {
+      // Відправляємо email власнику книги
+      await sendExchangeRequestEmail(
+        targetBook.owner.email,
+        targetBook.owner.name,
+        requestor.name,
+        requestor.email,
+        targetBook.name,
+        requestor.books
+      );
+    }
+
+    res.status(201).json({ message: 'Exchange request sent', exchangeRequest });
+  } catch (error) {
+    console.error('requestExchange error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
