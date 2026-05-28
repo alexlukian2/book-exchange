@@ -92,9 +92,9 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 // ── Server Start ────────────────────────────────────────────────────────────
-const server = app.listen(config.port, '127.0.0.1', () => {
-  console.log(`Server is running on http://127.0.0.1:${config.port}`);
-  console.log(`API Docs: http://127.0.0.1:${config.port}/api-docs`);
+const server = app.listen(config.port, '0.0.0.0', () => {
+  console.log(`Server is running on http://0.0.0.0:${config.port}`);
+  console.log(`API Docs: http://0.0.0.0:${config.port}/api-docs`);
 });
 
 // ── Graceful Shutdown ───────────────────────────────────────────────────────
