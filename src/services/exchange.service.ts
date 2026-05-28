@@ -51,7 +51,7 @@ export async function requestExchange(senderId: string, targetBookId: string) {
         requestor.books
       );
     }
-  } catch (error) {
+  } catch (_error) {
     // Log error but don't fail the exchange request itself
     console.error('Failed to send exchange request email');
   }
@@ -113,7 +113,7 @@ export async function updateExchangeStatus(
       action,
       request.receiver.name
     );
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to send exchange status email');
   }
 

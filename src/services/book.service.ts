@@ -130,7 +130,7 @@ export async function deleteBook(bookId: string, userId: string, userRole: 'USER
   const book = await prisma.book.findUnique({ where: { id: bookId } });
 
   if (!book) return 'NOT_FOUND' as const;
-  
+
   // Admins can delete any book. Regular users can only delete their own.
   if (userRole !== 'ADMIN' && book.ownerId !== userId) {
     return 'FORBIDDEN' as const;

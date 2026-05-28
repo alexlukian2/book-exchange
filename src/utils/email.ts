@@ -24,9 +24,7 @@ export const sendExchangeRequestEmail = async (
   targetBookTitle: string,
   requestorBooks: { title: string; author: string }[]
 ): Promise<void> => {
-  const booksList = requestorBooks
-    .map((book) => `- ${book.title} (${book.author})`)
-    .join('\n');
+  const booksList = requestorBooks.map((book) => `- ${book.title} (${book.author})`).join('\n');
 
   const mailOptions = {
     from: `"Book Exchange" <${config.smtp.user}>`,

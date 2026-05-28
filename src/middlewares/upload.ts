@@ -45,9 +45,10 @@ export const validateFileContent = async (
 
   try {
     // file-type is ESM-only — use dynamic import to load in CJS context
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const fileType: { fileTypeFromBuffer: (buf: Uint8Array) => Promise<{ mime: string; ext: string } | undefined> } =
-      await (new Function('return import("file-type")')() as Promise<any>);
+
+    const fileType = await (new Function('return import("file-type")')() as Promise<{
+      fileTypeFromBuffer: (buf: Uint8Array) => Promise<{ mime: string; ext: string } | undefined>;
+    }>);
     const detectedType = await fileType.fileTypeFromBuffer(req.file.buffer);
 
     if (!detectedType || !ALLOWED_MIME_TYPES.includes(detectedType.mime)) {

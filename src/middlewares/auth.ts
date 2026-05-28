@@ -8,10 +8,10 @@ export const authenticate = requireAuth();
 // Use this middleware to ensure the user exists in our DB and is an admin
 export const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const auth = (req as any).auth; // In Clerk, req.auth contains the user's ID
+    const auth = (req as Request & { auth?: { userId?: string } }).auth; // In Clerk, req.auth contains the user's ID
     if (!auth || !auth.userId) {
-       res.status(401).json({ error: 'Unauthorized' });
-       return;
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
     }
 
     const user = await prisma.user.findUnique({
@@ -24,7 +24,7 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
     }
 
     next();
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };

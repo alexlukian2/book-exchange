@@ -42,7 +42,7 @@ export const clerkWebhookHandler = async (req: Request, res: Response) => {
       'svix-timestamp': svix_timestamp,
       'svix-signature': svix_signature,
     }) as ClerkWebhookEvent;
-  } catch (err) {
+  } catch (_err) {
     console.error('Webhook signature verification failed');
     res.status(400).json({ error: 'Invalid signature' });
     return;
@@ -50,47 +50,39 @@ export const clerkWebhookHandler = async (req: Request, res: Response) => {
 
   const { id, email_addresses, first_name, last_name, image_url } = evt.data;
   const email =
-    email_addresses && email_addresses.length > 0
-      ? email_addresses[0].email_address
-      : '';
+    email_addresses && email_addresses.length > 0 ? email_addresses[0].email_address : '';
   const name = `${first_name || ''} ${last_name || ''}`.trim() || 'Unknown User';
 
-  try {
-    switch (evt.type) {
-      case 'user.created': {
-        await userService.createUser({
-          id,
-          email,
-          name,
-          avatarUrl: image_url || null,
-        });
-        console.log(`User ${id} created in database`);
-        break;
-      }
-
-      case 'user.updated': {
-        await userService.updateUser(id, {
-          email,
-          name,
-          avatarUrl: image_url || null,
-        });
-        console.log(`User ${id} updated in database`);
-        break;
-      }
-
-      case 'user.deleted': {
-        await userService.deleteUser(id);
-        console.log(`User ${id} deleted from database`);
-        break;
-      }
-
-      default:
-        console.log(`Unhandled webhook event type: ${evt.type}`);
+  switch (evt.type) {
+    case 'user.created': {
+      await userService.createUser({
+        id,
+        email,
+        name,
+        avatarUrl: image_url || null,
+      });
+      console.log(`User ${id} created in database`);
+      break;
     }
-  } catch (error) {
-    console.error(`Error processing webhook event ${evt.type}:`, error);
-    res.status(500).json({ error: 'Failed to process webhook event' });
-    return;
+
+    case 'user.updated': {
+      await userService.updateUser(id, {
+        email,
+        name,
+        avatarUrl: image_url || null,
+      });
+      console.log(`User ${id} updated in database`);
+      break;
+    }
+
+    case 'user.deleted': {
+      await userService.deleteUser(id);
+      console.log(`User ${id} deleted from database`);
+      break;
+    }
+
+    default:
+      console.log(`Unhandled webhook event type: ${evt.type}`);
   }
 
   res.status(200).json({ success: true });
